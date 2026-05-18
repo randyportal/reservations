@@ -13,9 +13,11 @@ RUN wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkh
 
 WORKDIR /app
 
-# 3. CREAR EL ACCESO DIRECTO QUE PIDE LA APP
-# La app busca en ./bin/wkhtmltopdf, así que lo vinculamos al del sistema
-RUN mkdir -p /app/bin && ln -s /usr/local/bin/wkhtmltopdf /app/bin/wkhtmltopdf
+# 3. Crear carpetas necesarias y dar permisos totales
+RUN mkdir -p /app/bin /app/static /app/media
+RUN ln -s /usr/local/bin/wkhtmltopdf /app/bin/wkhtmltopdf
+# Damos permisos de escritura a toda la carpeta /app para evitar errores de SQLite
+RUN chmod -R 777 /app
 
 # 4. Instalar dependencias de Python
 COPY requirements.txt .
@@ -25,6 +27,9 @@ RUN sed -i 's/git:\/\/github.com/https:\/\/github.com/g' requirements.txt \
 
 COPY . .
 
+# Asegurar permisos después de copiar el código
+RUN chmod -R 777 /app
+
 ENV PRODUCTION=1
 ENV DATABASE_NAME=database.sqlite3
 ENV PYTHONUNBUFFERED=1
@@ -32,4 +37,5 @@ ENV PYTHONDONTWRITEBYTECODE=1
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn reservations.wsgi:application --bind 0.0.0.0:8000"]
+# Comando de inicio con limpieza de archivos de bloqueo de SQLite si existieran
+CMD ["sh", "-c", "rm -f /app/database.sqlite3-journal && python manage.py migrate && python manage.py collectstatic --noinput && gunicorn reservations.wsgi:application --bind 0.0.0.0:8000"]
